@@ -1,24 +1,57 @@
-import logo from './logo.svg';
-import './App.css';
+"use client";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import Header from "./components/Header";
+import Login from "./components/Login";
+import Dashboard from "./components/Dashboard";
+import "./styles/theme.css";
+
+function AppContent() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "var(--gray-100)",
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              fontSize: "48px",
+              marginBottom: "16px",
+              color: "var(--alfamart-red)",
+            }}
+          >
+            🏪
+          </div>
+          <h2 style={{ color: "var(--alfamart-red)" }}>Loading...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", backgroundColor: "var(--gray-100)" }}>
+      <Header />
+      <Dashboard />
+    </div>
+  );
+}
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

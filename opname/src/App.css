@@ -1,38 +1,82 @@
-.App {
-  text-align: center;
+/* App.css (versi bersih & responsif) */
+
+:root {
+  --alfamart-red: #e30613;
+  --white: #ffffff;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f9f9f9;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+/* Global container for layout */
+.container {
+  width: 90%;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+/* Button outline */
+.btn.btn-outline {
+  background: transparent;
+  border: 2px solid;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.btn.btn-outline:hover {
+  background: var(--white);
+  color: var(--alfamart-red);
+}
+
+/* Header responsive layout */
+.header-container {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  flex-wrap: wrap;
 }
 
-.App-link {
-  color: #61dafb;
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 500px) {
+  .header-container {
+    flex-direction: column;
+    align-items: center; /* ⬅️ Pusatkan isi ke tengah */
+    gap: 12px;
+    text-align: center; /* ⬅️ Agar teks seperti nama user ikut tengah */
   }
-  to {
-    transform: rotate(360deg);
+
+  .header-left,
+  .header-right {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .header-right {
+    justify-content: center;
+  }
+
+  .header-right button {
+    width: 100%; /* Optional: agar tombol logout full lebar */
+    max-width: 200px;
   }
 }
+
+
+
