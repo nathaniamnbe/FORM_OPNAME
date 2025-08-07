@@ -1,3 +1,5 @@
+// src/components/OpnameForm.js - Versi Final Stateful
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -5,102 +7,116 @@ import { useAuth } from "../context/AuthContext";
 
 const OpnameForm = ({ onBack, selectedStore }) => {
   const { user } = useAuth();
-  const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Dummy data untuk kategori dan jenis pekerjaan yang akan di-opname
-  // Ini akan otomatis terisi, bukan dipilih user
-  const [opnameItems, setOpnameItems] = useState([
-    {
-      id: 1,
-      kategori_pekerjaan: "Instalasi",
-      jenis_pekerjaan: "Mengganti Lampu",
-      vol_rab: 90,
-      satuan: "unit",
-      volume_akhir: "",
-      selisih: "",
-      nama_pic_penginput: user ? user.name : "",
-      approval: "pending",
-    },
-    {
-      id: 2,
-      kategori_pekerjaan: "Instalasi",
-      jenis_pekerjaan: "Mengganti Kursi",
-      vol_rab: 34,
-      satuan: "unit",
-      volume_akhir: "",
-      selisih: "",
-      nama_pic_penginput: user ? user.name : "",
-      approval: "pending",
-    },
-    {
-      id: 3,
-      kategori_pekerjaan: "Perbaikan",
-      jenis_pekerjaan: "Perbaikan Pintu",
-      vol_rab: 10,
-      satuan: "unit",
-      volume_akhir: "",
-      selisih: "",
-      nama_pic_penginput: user ? user.name : "",
-      approval: "pending",
-    },
-    {
-      id: 4,
-      kategori_pekerjaan: "Perbaikan",
-      jenis_pekerjaan: "Perbaikan Jendela",
-      vol_rab: 15,
-      satuan: "unit",
-      volume_akhir: "",
-      selisih: "",
-      nama_pic_penginput: user ? user.name : "",
-      approval: "pending",
-    },
-  ]);
+  const [opnameItems, setOpnameItems] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [keteranganUmum, setKeteranganUmum] = useState("");
-  const [success, setSuccess] = useState(false);
-
+  // Mengambil data gabungan dari backend
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+    if (selectedStore?.kode_toko) {
+      setLoading(true);
+      // API ini sudah diubah di backend untuk mengembalikan data yang sudah tersimpan
+      fetch(`/api/opname?kode_toko=${selectedStore.kode_toko}`)
+        .then((res) => res.json())
+        .then((data) => {
+          // Data dari API sudah berisi status `isSubmitted`, `volume_akhir` yg tersimpan, dll.
+          const items = data.map((task, index) => ({
+            ...task,
+            id: index + 1, // ID lokal untuk UI
+            isSubmitting: false, // Untuk loading per item
+            nama_pic_penginput: user ? user.name : "", // Nama PIC
+          }));
+          setOpnameItems(items);
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error("Gagal mengambil detail pekerjaan:", err);
+          setLoading(false);
+        });
+    }
+  }, [selectedStore, user]);
 
   const handleVolumeAkhirChange = (id, value) => {
     setOpnameItems((prevItems) =>
       prevItems.map((item) => {
-        if (item.id === id) {
+        if (item.id === id && !item.isSubmitted) {
           const volAkhir = Number.parseFloat(value) || 0;
           const selisih = volAkhir - item.vol_rab;
-          return {
-            ...item,
-            volume_akhir: value,
-            selisih: selisih.toString(),
-          };
+          return { ...item, volume_akhir: value, selisih: selisih.toString() };
         }
         return item;
       })
     );
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Simulasi save data
-    console.log("Opname data:", {
-      kode_toko: selectedStore.id,
-      nama_toko: selectedStore.name,
-      tanggal: new Date().toISOString().split("T")[0],
-      jam_input: currentTime.toLocaleTimeString(),
-      opname_details: opnameItems,
-      keterangan_umum: keteranganUmum,
-      user_penginput: user ? user.name : "Unknown",
-    });
-    setSuccess(true);
-    setTimeout(() => {
-      setSuccess(false);
-      onBack(); // Kembali ke halaman pemilihan toko atau dashboard
-    }, 2000);
+  const handleItemSubmit = async (itemId) => {
+    const itemToSubmit = opnameItems.find((item) => item.id === itemId);
+
+    if (!itemToSubmit.volume_akhir) {
+      alert("Volume akhir harus diisi sebelum menyimpan.");
+      return;
+    }
+
+    setOpnameItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId ? { ...item, isSubmitting: true } : item
+      )
+    );
+
+    const submissionData = {
+      kode_toko: selectedStore.kode_toko,
+      nama_toko: selectedStore.nama_toko,
+      pic_username: user.username,
+      kategori_pekerjaan: itemToSubmit.kategori_pekerjaan,
+      jenis_pekerjaan: itemToSubmit.jenis_pekerjaan,
+      vol_rab: itemToSubmit.vol_rab,
+      satuan: itemToSubmit.satuan,
+      volume_akhir: itemToSubmit.volume_akhir,
+      selisih: itemToSubmit.selisih,
+    };
+
+    try {
+      const response = await fetch("/api/opname/item/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(submissionData),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+
+      // Update UI setelah berhasil menyimpan
+      setOpnameItems((prev) =>
+        prev.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                isSubmitting: false,
+                isSubmitted: true,
+                approval_status: "Pending",
+                submissionTime: result.tanggal_submit,
+                item_id: result.item_id,
+              }
+            : item
+        )
+      );
+    } catch (error) {
+      alert(`Error: ${error.message}`);
+      setOpnameItems((prev) =>
+        prev.map((item) =>
+          item.id === itemId ? { ...item, isSubmitting: false } : item
+        )
+      );
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="container" style={{ textAlign: "center" }}>
+        <h3>Loading...</h3>
+      </div>
+    );
+  }
 
   return (
     <div className="container" style={{ paddingTop: "20px" }}>
@@ -111,64 +127,23 @@ const OpnameForm = ({ onBack, selectedStore }) => {
             alignItems: "center",
             marginBottom: "24px",
             gap: "16px",
-            flexWrap: "wrap",
           }}
         >
-          <button
-            onClick={onBack}
-            className="btn btn-outline"
-            style={{ padding: "8px 16px" }}
-          >
+          <button type="button" onClick={onBack} className="btn btn-outline">
             ← Kembali
           </button>
           <h2 style={{ color: "var(--alfamart-red)" }}>Input Opname Harian</h2>
         </div>
 
-        {success && (
-          <div className="alert alert-success">
-            Data opname berhasil disimpan! Menunggu approval dari mandor.
-          </div>
-        )}
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "20px",
-            marginBottom: "20px",
-          }}
-        >
-          <div className="form-group">
-            <label className="form-label">Kode Toko</label>
-            <input
-              type="text"
-              className="form-input"
-              value={`${selectedStore.id} - ${selectedStore.name}`}
-              readOnly
-              style={{ backgroundColor: "var(--gray-100)" }}
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Tanggal & Jam</label>
-            <input
-              type="text"
-              className="form-input"
-              value={`${new Date().toLocaleDateString()} ${currentTime.toLocaleTimeString()}`}
-              readOnly
-              style={{ backgroundColor: "var(--gray-100)" }}
-            />
-          </div>
-        </div>
-
         <h3 style={{ color: "var(--alfamart-red)", marginBottom: "16px" }}>
           Detail Pekerjaan
         </h3>
-        <div style={{ overflowX: "auto", marginBottom: "20px" }}>
+        <div style={{ overflowX: "auto" }}>
           <table
             style={{
               width: "100%",
               borderCollapse: "collapse",
-              backgroundColor: "var(--white)",
+              textAlign: "left",
             }}
           >
             <thead>
@@ -178,82 +153,29 @@ const OpnameForm = ({ onBack, selectedStore }) => {
                   color: "var(--white)",
                 }}
               >
-                <th
-                  style={{
-                    padding: "12px",
-                    textAlign: "left",
-                    minWidth: "150px",
-                  }}
-                >
-                  Kategori Pekerjaan
-                </th>
-                <th
-                  style={{
-                    padding: "12px",
-                    textAlign: "left",
-                    minWidth: "180px",
-                  }}
-                >
-                  Jenis Pekerjaan
-                </th>
-                <th
-                  style={{
-                    padding: "12px",
-                    textAlign: "center",
-                    minWidth: "100px",
-                  }}
-                >
+                <th style={{ padding: "12px" }}>Jenis Pekerjaan</th>
+                <th style={{ padding: "12px", textAlign: "center" }}>
                   Vol RAB
                 </th>
-                <th
-                  style={{
-                    padding: "12px",
-                    textAlign: "center",
-                    minWidth: "120px",
-                  }}
-                >
+                <th style={{ padding: "12px", textAlign: "center" }}>
                   Volume Akhir
                 </th>
-                <th
-                  style={{
-                    padding: "12px",
-                    textAlign: "center",
-                    minWidth: "100px",
-                  }}
-                >
+                <th style={{ padding: "12px", textAlign: "center" }}>
                   Selisih
                 </th>
-                <th
-                  style={{
-                    padding: "12px",
-                    textAlign: "left",
-                    minWidth: "150px",
-                  }}
-                >
-                  Nama PIC Penginput
-                </th>
-                <th
-                  style={{
-                    padding: "12px",
-                    textAlign: "center",
-                    minWidth: "120px",
-                  }}
-                >
-                  Approval
-                </th>
+                <th style={{ padding: "12px", textAlign: "center" }}>Status</th>
+                <th style={{ padding: "12px", textAlign: "center" }}>Aksi</th>
               </tr>
             </thead>
             <tbody>
-              {opnameItems.map((item, index) => (
+              {opnameItems.map((item) => (
                 <tr
                   key={item.id}
                   style={{
-                    borderBottom: "1px solid var(--gray-300)",
-                    backgroundColor:
-                      index % 2 === 0 ? "var(--white)" : "var(--gray-100)",
+                    background: item.isSubmitted ? "#f0fff0" : "transparent",
+                    borderBottom: "1px solid #ddd",
                   }}
                 >
-                  <td style={{ padding: "12px" }}>{item.kategori_pekerjaan}</td>
                   <td style={{ padding: "12px" }}>{item.jenis_pekerjaan}</td>
                   <td style={{ padding: "12px", textAlign: "center" }}>
                     {item.vol_rab} {item.satuan}
@@ -262,95 +184,51 @@ const OpnameForm = ({ onBack, selectedStore }) => {
                     <input
                       type="number"
                       className="form-input"
+                      style={{ width: "100px" }}
                       value={item.volume_akhir}
                       onChange={(e) =>
                         handleVolumeAkhirChange(item.id, e.target.value)
                       }
-                      placeholder="0"
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        fontSize: "14px",
-                      }}
-                      required
+                      disabled={item.isSubmitted}
                     />
                   </td>
                   <td style={{ padding: "12px", textAlign: "center" }}>
-                    <span
-                      style={{
-                        color:
-                          item.selisih < 0
-                            ? "#F44336"
-                            : item.selisih > 0
-                            ? "#4CAF50"
-                            : "inherit",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {item.selisih ? `${item.selisih} ${item.satuan}` : ""}
-                    </span>
+                    {item.selisih} {item.satuan}
                   </td>
-                  <td style={{ padding: "12px" }}>{item.nama_pic_penginput}</td>
                   <td style={{ padding: "12px", textAlign: "center" }}>
                     <span
-                      style={{
-                        display: "inline-block",
-                        padding: "4px 8px",
-                        borderRadius: "4px",
-                        fontSize: "12px",
-                        fontWeight: "bold",
-                        backgroundColor:
-                          item.approval === "pending"
-                            ? "var(--alfamart-yellow)"
-                            : item.approval === "approved"
-                            ? "#4CAF50"
-                            : "#F44336",
-                        color:
-                          item.approval === "pending"
-                            ? "var(--gray-800)"
-                            : "var(--white)",
-                      }}
+                      className={`badge ${
+                        item.approval_status === "Pending"
+                          ? "badge-warning"
+                          : item.approval_status === "Approved"
+                          ? "badge-success"
+                          : "badge-light"
+                      }`}
                     >
-                      {item.approval === "pending"
-                        ? "Pending"
-                        : item.approval === "approved"
-                        ? "Approved"
-                        : "Not Approved"}
+                      {item.approval_status}
                     </span>
+                  </td>
+                  <td style={{ padding: "12px", textAlign: "center" }}>
+                    {item.isSubmitted ? (
+                      <div style={{ fontSize: "12px", color: "green" }}>
+                        <strong>Tersimpan</strong>
+                        <br />
+                        <small>{item.submissionTime}</small>
+                      </div>
+                    ) : (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleItemSubmit(item.id)}
+                        disabled={item.isSubmitting || !item.volume_akhir}
+                      >
+                        {item.isSubmitting ? "..." : "Simpan"}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Keterangan Umum</label>
-          <textarea
-            name="keterangan_umum"
-            className="form-input"
-            value={keteranganUmum}
-            onChange={(e) => setKeteranganUmum(e.target.value)}
-            placeholder="Keterangan tambahan untuk seluruh opname ini (opsional)"
-            rows="3"
-            style={{ resize: "vertical" }}
-          />
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            gap: "16px",
-            marginTop: "32px",
-            justifyContent: "flex-end",
-          }}
-        >
-          <button type="button" onClick={onBack} className="btn btn-outline">
-            Batal
-          </button>
-          <button type="submit" className="btn btn-primary">
-            Simpan Opname
-          </button>
         </div>
       </div>
     </div>

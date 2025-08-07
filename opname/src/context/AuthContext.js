@@ -16,53 +16,49 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Simulasi data user (nanti bisa diganti dengan API)
-  const users = [
-    {
-      id: 1,
-      username: "pic001",
-      password: "pic123",
-      name: "Ahmad Sutanto",
-      role: "pic",
-      store: "Alfamart Sudirman",
-    },
-    {
-      id: 2,
-      username: "kontraktor001",
-      password: "kontraktor123",
-      name: "Budi Santoso",
-      role: "kontraktor",
-      company: "PT Konstruksi Jaya",
-    },
-  ];
-
   useEffect(() => {
-    // Check if user is already logged in
-    const savedUser = localStorage.getItem("alfamart_user");
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+    // Mengecek apakah user sudah login dari session sebelumnya
+    try {
+      const savedUser = localStorage.getItem("alfamart_user");
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      }
+    } catch (error) {
+      console.error("Gagal memuat data user dari localStorage", error);
+      localStorage.removeItem("alfamart_user");
     }
     setLoading(false);
   }, []);
 
-  const login = (username, password) => {
-    const foundUser = users.find(
-      (u) => u.username === username && u.password === password
-    );
+  const login = async (username, password) => {
+    try {
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
 
-    if (foundUser) {
-      const userWithoutPassword = { ...foundUser };
-      delete userWithoutPassword.password;
-
-      setUser(userWithoutPassword);
-      localStorage.setItem(
-        "alfamart_user",
-        JSON.stringify(userWithoutPassword)
-      );
-      return { success: true };
+      if (response.ok) {
+        const foundUser = await response.json();
+        setUser(foundUser);
+        localStorage.setItem("alfamart_user", JSON.stringify(foundUser));
+        return { success: true };
+      } else {
+        const errorData = await response.json();
+        return {
+          success: false,
+          message: errorData.message || "Username atau password salah",
+        };
+      }
+    } catch (error) {
+      console.error("Error saat fetch ke API login:", error);
+      return {
+        success: false,
+        message: "Tidak dapat terhubung ke server. Cek koneksi internet Anda.",
+      };
     }
-
-    return { success: false, message: "Username atau password salah" };
   };
 
   const logout = () => {

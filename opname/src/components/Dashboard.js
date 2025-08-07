@@ -1,39 +1,37 @@
+// src/components/Dashboard.js - Versi Final tanpa Header Duplikat
+
 "use client";
 
-import { useState, useEffect } from "react"; // Import useEffect
+import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import OpnameForm from "./OpnameForm";
-import RabView from "./RabView";
-import NotificationDetailView from "./NotificationDetailView";
 import StoreSelectionPage from "./StoreSelectionPage";
-import HistoryView from "./HistoryView";
-import { dummyNotifications } from "../data/dummyData"; // Import dummy notifications
+import FinalOpnameView from "./FinalOpnameView";
+import ApprovalPage from "./ApprovalPage";
 
 const Dashboard = () => {
+  // Hook useAuth sekarang hanya mengambil 'user', karena 'logout' akan ada di header utama
   const { user } = useAuth();
   const [activeView, setActiveView] = useState("dashboard");
   const [selectedStore, setSelectedStore] = useState(null);
 
-  // Calculate pending notifications count dynamically from dummy data
-  const [pendingNotificationsCount, setPendingNotificationsCount] = useState(0);
-
-  useEffect(() => {
-    if (user?.role === "kontraktor") {
-      const count = dummyNotifications.filter(
-        (notif) => notif.status === "pending"
-      ).length;
-      setPendingNotificationsCount(count);
-    }
-  }, [user]);
+  if (!user) {
+    return (
+      <div style={{ textAlign: "center", marginTop: "50px" }}>
+        <h2>Loading data pengguna...</h2>
+      </div>
+    );
+  }
 
   const handleSelectStore = (store, nextView) => {
     setSelectedStore(store);
     setActiveView(nextView);
   };
 
+  // Fungsi renderContent tidak berubah, hanya akan dipanggil di dalam return utama
   const renderContent = () => {
     switch (activeView) {
-      case "store-selection": // For PIC's opname input
+      case "store-selection-pic":
         return (
           <StoreSelectionPage
             onSelectStore={(store) => handleSelectStore(store, "opname")}
@@ -41,73 +39,70 @@ const Dashboard = () => {
             type="opname"
           />
         );
+
       case "opname":
         return (
           <OpnameForm
-            onBack={() => setActiveView("store-selection")}
+            onBack={() => setActiveView("store-selection-pic")}
             selectedStore={selectedStore}
           />
         );
-      case "rab":
-        return <RabView onBack={() => setActiveView("dashboard")} />;
-      case "notification-store-selection": // For Kontraktor's notification
+
+      case "final-opname-selection":
         return (
           <StoreSelectionPage
             onSelectStore={(store) =>
-              handleSelectStore(store, "notification-detail")
+              handleSelectStore(store, "final-opname-detail")
             }
             onBack={() => setActiveView("dashboard")}
-            type="notifications" // Pass type to StoreSelectionPage
-            notificationsData={dummyNotifications} // Pass dummy notifications data
+            type="opname"
           />
         );
-      case "notification-detail":
+
+      case "final-opname-detail":
         return (
-          <NotificationDetailView
-            onBack={() => setActiveView("notification-store-selection")}
+          <FinalOpnameView
+            onBack={() => setActiveView("final-opname-selection")}
             selectedStore={selectedStore}
           />
         );
-      case "history-store-selection": // For Kontraktor's history
+
+      case "store-selection-kontraktor":
         return (
           <StoreSelectionPage
             onSelectStore={(store) =>
-              handleSelectStore(store, "history-detail")
+              handleSelectStore(store, "approval-detail")
             }
             onBack={() => setActiveView("dashboard")}
-            type="history"
+            type="approval"
           />
         );
-      case "history-detail":
+
+      case "approval-detail":
         return (
-          <HistoryView
-            onBack={() => setActiveView("history-store-selection")}
+          <ApprovalPage
+            onBack={() => setActiveView("store-selection-kontraktor")}
             selectedStore={selectedStore}
           />
         );
+
       default:
         return (
           <div className="container" style={{ paddingTop: "40px" }}>
             <div className="card">
-              <h2
-                style={{
-                  color: "var(--alfamart-red)",
-                  marginBottom: "16px",
-                  textAlign: "center",
-                }}
-              >
+              <h2 style={{ color: "var(--alfamart-red)", textAlign: "center" }}>
                 Selamat Datang, {user.name}!
               </h2>
               <p
                 style={{
                   textAlign: "center",
-                  color: "var(--gray-600)",
+                  color: "#666",
                   marginBottom: "32px",
                 }}
               >
                 {user.role === "pic"
-                  ? `PIC ${user.store}`
-                  : `Kontraktor ${user.company}`}
+                  ? `PIC: ${user.store}`
+                  : `Kontraktor: ${user.company}`}
               </p>
 
               <div
@@ -115,37 +110,39 @@ const Dashboard = () => {
                   display: "grid",
                   gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
                   gap: "20px",
-                  marginTop: "32px",
                 }}
               >
                 {user.role === "pic" && (
                   <>
                     <button
-                      onClick={() => setActiveView("store-selection")}
+                      onClick={() => setActiveView("store-selection-pic")}
                       className="btn btn-primary"
                       style={{
                         height: "120px",
+                        display: "flex",
                         flexDirection: "column",
-                        fontSize: "18px",
-                        gap: "12px",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        gap: "8px",
                       }}
                     >
                       <span style={{ fontSize: "32px" }}>📝</span>
                       Input Opname Harian
                     </button>
-
                     <button
-                      onClick={() => setActiveView("rab")}
-                      className="btn btn-secondary"
+                      onClick={() => setActiveView("final-opname-selection")}
+                      className="btn btn-success"
                       style={{
                         height: "120px",
+                        display: "flex",
                         flexDirection: "column",
-                        fontSize: "18px",
-                        gap: "12px",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        gap: "8px",
                       }}
                     >
-                      <span style={{ fontSize: "32px" }}>📊</span>
-                      Lihat RAB
+                      <span style={{ fontSize: "32px" }}>📄</span>
+                      Lihat Opname Final
                     </button>
                   </>
                 )}
@@ -154,58 +151,30 @@ const Dashboard = () => {
                   <>
                     <button
                       onClick={() =>
-                        setActiveView("notification-store-selection")
+                        setActiveView("store-selection-kontraktor")
                       }
-                      className="btn btn-info" /* Changed to btn-info */
+                      className="btn btn-info"
                       style={{
                         height: "120px",
+                        display: "flex",
                         flexDirection: "column",
-                        fontSize: "18px",
-                        gap: "12px",
-                        position: "relative", // Ensure badge positioning
+                        justifyContent: "center",
+                        alignItems: "center",
+                        gap: "8px",
                       }}
                     >
                       <span style={{ fontSize: "32px" }}>🔔</span>
-                      Notifikasi
-                      {pendingNotificationsCount > 0 && (
-                        <span
-                          style={{
-                            backgroundColor: "var(--alfamart-red)",
-                            color: "var(--white)",
-                            borderRadius: "50%",
-                            width: "28px",
-                            height: "28px",
-                            fontSize: "14px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            position: "absolute",
-                            top: "8px",
-                            right: "8px",
-                          }}
-                        >
-                          {pendingNotificationsCount}
-                        </span>
-                      )}
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          opacity: "0.8",
-                          marginTop: "4px",
-                        }}
-                      >
-                        Pending Approval
-                      </div>
+                      Persetujuan Opname
                     </button>
-
                     <button
-                      onClick={() => setActiveView("history-store-selection")}
                       className="btn btn-secondary"
                       style={{
                         height: "120px",
+                        display: "flex",
                         flexDirection: "column",
-                        fontSize: "18px",
-                        gap: "12px",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        gap: "8px",
                       }}
                     >
                       <span style={{ fontSize: "32px" }}>📜</span>
@@ -215,115 +184,13 @@ const Dashboard = () => {
                 )}
               </div>
             </div>
-
-            {/* Quick Stats */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                gap: "20px",
-                marginTop: "32px",
-              }}
-            >
-              {user.role === "kontraktor" ? (
-                <>
-                  <div className="card" style={{ textAlign: "center" }}>
-                    <h3 style={{ color: "var(--alfamart-red)" }}>
-                      Pending Approval
-                    </h3>
-                    <div
-                      style={{
-                        fontSize: "32px",
-                        fontWeight: "bold",
-                        marginTop: "8px",
-                        color: "var(--alfamart-yellow)",
-                      }}
-                    >
-                      {pendingNotificationsCount}
-                    </div>
-                  </div>
-
-                  <div className="card" style={{ textAlign: "center" }}>
-                    <h3 style={{ color: "var(--alfamart-red)" }}>Total RAB</h3>
-                    <div
-                      style={{
-                        fontSize: "32px",
-                        fontWeight: "bold",
-                        marginTop: "8px",
-                      }}
-                    >
-                      8
-                    </div>
-                  </div>
-                  <div className="card" style={{ textAlign: "center" }}>
-                    <h3 style={{ color: "var(--alfamart-red)" }}>
-                      Opname Disetujui
-                    </h3>
-                    <div
-                      style={{
-                        fontSize: "32px",
-                        fontWeight: "bold",
-                        marginTop: "8px",
-                        color: "#4CAF50",
-                      }}
-                    >
-                      5
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="card" style={{ textAlign: "center" }}>
-                    <h3 style={{ color: "var(--alfamart-red)" }}>
-                      Opname Bulan Ini
-                    </h3>
-                    <div
-                      style={{
-                        fontSize: "32px",
-                        fontWeight: "bold",
-                        marginTop: "8px",
-                      }}
-                    >
-                      12
-                    </div>
-                  </div>
-                  <div className="card" style={{ textAlign: "center" }}>
-                    <h3 style={{ color: "var(--alfamart-red)" }}>
-                      Opname Disetujui
-                    </h3>
-                    <div
-                      style={{
-                        fontSize: "32px",
-                        fontWeight: "bold",
-                        marginTop: "8px",
-                        color: "#4CAF50",
-                      }}
-                    >
-                      9
-                    </div>
-                  </div>
-
-                  <div className="card" style={{ textAlign: "center" }}>
-                    <h3 style={{ color: "var(--alfamart-red)" }}>Total RAB</h3>
-                    <div
-                      style={{
-                        fontSize: "32px",
-                        fontWeight: "bold",
-                        marginTop: "8px",
-                      }}
-                    >
-                      8
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
           </div>
         );
     }
   };
 
-  return <div>{renderContent()}</div>;
+  // Return sekarang HANYA merender konten utama, tanpa <header> atau <main>
+  return renderContent();
 };
 
 export default Dashboard;

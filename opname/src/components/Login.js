@@ -16,7 +16,7 @@ const Login = () => {
     setLoading(true);
     setError("");
 
-    const result = login(username, password);
+    const result = await login(username, password);
 
     if (!result.success) {
       setError(result.message);
@@ -94,21 +94,7 @@ const Login = () => {
           </button>
         </form>
 
-        <div
-          style={{
-            marginTop: "24px",
-            padding: "16px",
-            backgroundColor: "var(--gray-100)",
-            borderRadius: "8px",
-            fontSize: "14px",
-          }}
-        >
-          <strong>Demo Accounts:</strong>
-          <div style={{ marginTop: "8px" }}>
-            <div>PIC: pic001 / pic123</div>
-            <div>Kontraktor: kontraktor001 / kontraktor123</div>
-          </div>
-        </div>
+        
       </div>
     </div>
   );
