@@ -1,11 +1,12 @@
-// src/components/FinalOpnameView.js - Versi Final Diperbarui
+// src/components/FinalOpnameView.js - Versi Final yang Lebih Rapi
 
 "use client";
 
 import { useState, useEffect } from "react";
+// 1. Impor fungsi yang baru kita buat
+import { generateFinalOpnamePDF } from "../utils/pdfGenerator";
 
 const FinalOpnameView = ({ onBack, selectedStore }) => {
-  // Inisialisasi state sebagai objek kosong, karena kita mengharapkan objek
   const [submissionsByDate, setSubmissionsByDate] = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -25,18 +26,20 @@ const FinalOpnameView = ({ onBack, selectedStore }) => {
     }
   }, [selectedStore]);
 
+  // 2. Fungsi generatePDF sekarang menjadi sangat sederhana
+  const handleDownloadPDF = () => {
+    // Cukup panggil fungsi dari file terpisah dengan memberikan data yang dibutuhkan
+    generateFinalOpnamePDF(submissionsByDate, selectedStore);
+  };
+
   if (loading) {
     return (
-      <div
-        className="container"
-        style={{ paddingTop: "20px", textAlign: "center" }}
-      >
+      <div className="container" style={{ textAlign: "center" }}>
         <h3>Loading data opname...</h3>
       </div>
     );
   }
 
-  // Ambil semua tanggal dari keys objek
   const dates = Object.keys(submissionsByDate);
 
   return (
@@ -46,27 +49,36 @@ const FinalOpnameView = ({ onBack, selectedStore }) => {
           style={{
             display: "flex",
             alignItems: "center",
+            justifyContent: "space-between",
             marginBottom: "24px",
             gap: "16px",
+            flexWrap: "wrap",
           }}
         >
-          <button
-            onClick={onBack}
-            className="btn btn-outline"
-            style={{ padding: "8px 16px" }}
-          >
-            ← Kembali
-          </button>
-          <h2 style={{ color: "var(--alfamart-red)" }}>
-            Riwayat Opname Final - {selectedStore.kode_toko}
-          </h2>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <button
+              onClick={onBack}
+              className="btn btn-outline"
+              style={{ padding: "8px 16px" }}
+            >
+              ← Kembali
+            </button>
+            <h2 style={{ color: "var(--alfamart-red)", margin: 0 }}>
+              Riwayat Opname Final - {selectedStore.kode_toko}
+            </h2>
+          </div>
+          {dates.length > 0 && (
+            // 3. Tombol ini sekarang memanggil handleDownloadPDF
+            <button onClick={handleDownloadPDF} className="btn btn-primary">
+              Download PDF
+            </button>
+          )}
         </div>
 
-        {/* Ubah pengecekan dari .length menjadi Object.keys().length */}
+        {/* ... Sisa dari kode JSX untuk menampilkan tabel tidak berubah ... */}
         {dates.length === 0 ? (
           <p>Belum ada data opname yang di-approve untuk toko ini.</p>
         ) : (
-          // Lakukan map pada setiap tanggal (keys dari objek)
           dates.map((date) => (
             <div
               key={date}
@@ -102,7 +114,6 @@ const FinalOpnameView = ({ onBack, selectedStore }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* Lakukan map lagi pada setiap item di dalam tanggal tersebut */}
                     {submissionsByDate[date].map((item, index) => (
                       <tr
                         key={index}

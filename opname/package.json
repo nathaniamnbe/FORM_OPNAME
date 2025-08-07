@@ -12,6 +12,8 @@
     "express": "^5.1.0",
     "google-auth-library": "^10.2.1",
     "google-spreadsheet": "^5.0.2",
+    "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-scripts": "5.0.1",
