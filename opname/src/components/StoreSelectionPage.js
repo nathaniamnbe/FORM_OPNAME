@@ -1,4 +1,4 @@
-// src/components/StoreSelectionPage.js - Versi Final Dinamis
+// src/components/StoreSelectionPage.js - Versi Final Lengkap dengan Filter
 
 "use client";
 
@@ -11,22 +11,29 @@ const StoreSelectionPage = ({ onSelectStore, onBack, type }) => {
   const [loading, setLoading] = useState(true);
   const [notificationCounts, setNotificationCounts] = useState({});
 
+  // State untuk menyimpan teks dari kolom pencarian
+  const [searchTerm, setSearchTerm] = useState("");
+
   useEffect(() => {
     if (!user) return;
 
     setLoading(true);
     let storeApiUrl = "";
-    // Tentukan API mana yang akan dipanggil berdasarkan peran pengguna dan tipe halaman
-    if (type === "opname" && user.role === "pic") {
+
+    // Tentukan API mana yang akan dipanggil berdasarkan peran pengguna dan tujuan halaman
+    if ((type === "opname" || type === "final-opname") && user.role === "pic") {
       storeApiUrl = `/api/toko?username=${user.username}`;
-    } else if (type === "approval" && user.role === "kontraktor") {
+    } else if (
+      (type === "approval" || type === "history") &&
+      user.role === "kontraktor"
+    ) {
       storeApiUrl = `/api/toko_kontraktor?username=${user.username}`;
     } else {
       setLoading(false);
       return;
     }
 
-    // Ambil daftar toko
+    // Ambil daftar toko dari API yang sesuai
     fetch(storeApiUrl)
       .then((res) => res.json())
       .then((data) => {
@@ -38,7 +45,7 @@ const StoreSelectionPage = ({ onSelectStore, onBack, type }) => {
         setLoading(false);
       });
 
-    // Jika kontraktor, ambil juga jumlah notifikasi pending
+    // Jika kontraktor, ambil juga jumlah notifikasi pending untuk badge
     if (user.role === "kontraktor" && type === "approval") {
       fetch(`/api/opname/pending/counts?username=${user.username}`)
         .then((res) => res.json())
@@ -46,10 +53,18 @@ const StoreSelectionPage = ({ onSelectStore, onBack, type }) => {
     }
   }, [type, user]);
 
+  // Logika untuk memfilter daftar toko berdasarkan input di kolom pencarian
+  const filteredStores = stores.filter((store) =>
+    store.kode_toko.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (loading) {
     return (
-      <div className="container" style={{ textAlign: "center" }}>
-        <h3>Loading...</h3>
+      <div
+        className="container"
+        style={{ paddingTop: "20px", textAlign: "center" }}
+      >
+        <h3>Memuat data toko...</h3>
       </div>
     );
   }
@@ -63,6 +78,7 @@ const StoreSelectionPage = ({ onSelectStore, onBack, type }) => {
             alignItems: "center",
             marginBottom: "24px",
             gap: "16px",
+            flexWrap: "wrap",
           }}
         >
           <button
@@ -72,9 +88,20 @@ const StoreSelectionPage = ({ onSelectStore, onBack, type }) => {
           >
             ← Kembali
           </button>
-          <h2 style={{ color: "var(--alfamart-red)" }}>
+          <h2 style={{ color: "var(--alfamart-red)", margin: 0 }}>
             Pilih Toko untuk {type === "approval" ? "Persetujuan" : "Opname"}
           </h2>
+        </div>
+
+        {/* Kolom Filter Pencarian */}
+        <div className="form-group" style={{ marginBottom: "24px" }}>
+          <input
+            type="text"
+            className="form-input"
+            placeholder="Cari berdasarkan Kode Toko (contoh: A001)..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
 
         <div
@@ -84,7 +111,8 @@ const StoreSelectionPage = ({ onSelectStore, onBack, type }) => {
             gap: "20px",
           }}
         >
-          {stores.map((toko) => (
+          {/* Gunakan `filteredStores` untuk me-render tombol */}
+          {filteredStores.map((toko) => (
             <button
               key={toko.kode_toko}
               onClick={() => onSelectStore(toko)}
@@ -106,6 +134,7 @@ const StoreSelectionPage = ({ onSelectStore, onBack, type }) => {
               </div>
               <div style={{ fontSize: "14px" }}>{toko.nama_toko}</div>
               {user.role === "kontraktor" &&
+                type === "approval" &&
                 notificationCounts[toko.kode_toko] > 0 && (
                   <span
                     style={{
@@ -129,10 +158,18 @@ const StoreSelectionPage = ({ onSelectStore, onBack, type }) => {
                 )}
             </button>
           ))}
-          {stores.length === 0 && (
-            <p>Tidak ada toko yang ditugaskan untuk Anda.</p>
-          )}
         </div>
+
+        {/* Tampilkan pesan jika filter tidak menemukan hasil */}
+        {filteredStores.length === 0 && !loading && (
+          <div style={{ textAlign: "center", padding: "20px", color: "#666" }}>
+            <p>
+              {stores.length > 0
+                ? `Toko dengan kode "${searchTerm}" tidak ditemukan.`
+                : `Tidak ada toko yang ditugaskan untuk Anda.`}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
