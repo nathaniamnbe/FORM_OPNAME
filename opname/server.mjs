@@ -1,29 +1,52 @@
-// server.mjs - Versi Final Lengkap dengan DEBUG
+// server.mjs - Versi Final Lengkap (Semua Fitur Termasuk)
 
+// 1. Impor semua library yang dibutuhkan
 import express from "express";
 import cors from "cors";
 import { GoogleSpreadsheet } from "google-spreadsheet";
 import { JWT } from "google-auth-library";
 import dotenv from "dotenv";
+import multer from "multer";
+import { v2 as cloudinary } from "cloudinary";
+import axios from "axios";
+import sharp from "sharp";
+import PDFDocument from "pdfkit-table";
+import PDFMerger from "pdf-merger-js";
+import path from "path";
+import fs from "fs";
+import os from "os";
 
+// 2. Konfigurasi awal
 dotenv.config({ path: "./.env.local" });
 const app = express();
 const port = 3001;
 
+// 3. Middleware
 app.use(cors());
 app.use(express.json());
+const upload = multer({ storage: multer.memoryStorage() });
 
+// 4. Konfigurasi Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// 5. Otentikasi Google (HANYA untuk Sheets)
 const serviceAccountAuth = new JWT({
   email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
   key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
-
 const doc = new GoogleSpreadsheet(
   process.env.SPREADSHEET_ID,
   serviceAccountAuth
 );
 
+// =================================================================
+// FUNGSI BANTU
+// =================================================================
 const logLoginAttempt = async (username, status) => {
   try {
     await doc.loadInfo();
@@ -39,7 +62,42 @@ const logLoginAttempt = async (username, status) => {
   }
 };
 
-// --- AUTHENTICATION ---
+// =================================================================
+// API ENDPOINTS
+// =================================================================
+
+// --- Endpoint Upload Foto (dengan konversi ke JPEG) ---
+app.post("/api/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ message: "Tidak ada file yang di-upload." });
+    }
+    const jpegBuffer = await sharp(req.file.buffer)
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    const uploadStream = (buffer) => {
+      return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "opname_alfamart" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        stream.end(buffer);
+      });
+    };
+    const result = await uploadStream(jpegBuffer);
+    res.status(200).json({ link: result.secure_url });
+  } catch (error) {
+    console.error("Error saat upload ke Cloudinary:", error);
+    res.status(500).json({ message: "Gagal meng-upload file." });
+  }
+});
+
+// --- Endpoint Login ---
 app.post("/api/login", async (req, res) => {
   try {
     await doc.loadInfo();
@@ -87,7 +145,7 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// --- PIC WORKFLOW ---
+// --- Endpoint untuk PIC ---
 app.get("/api/toko", async (req, res) => {
   try {
     const { username } = req.query;
@@ -110,6 +168,8 @@ app.get("/api/toko", async (req, res) => {
         storesMap.set(kode_toko, {
           kode_toko: kode_toko,
           nama_toko: row.get("nama_toko"),
+          no_ulok: row.get("no_ulok") || "",
+          link_pdf: row.get("link_pdf") || "",
         });
       }
     });
@@ -119,6 +179,7 @@ app.get("/api/toko", async (req, res) => {
     res.status(500).json({ message: "Terjadi kesalahan pada server." });
   }
 });
+
 app.get("/api/opname", async (req, res) => {
   try {
     const { kode_toko } = req.query;
@@ -144,6 +205,7 @@ app.get("/api/opname", async (req, res) => {
           selisih: row.get("selisih"),
           approval_status: row.get("approval_status"),
           tanggal_submit: row.get("tanggal_submit"),
+          foto_url: row.get("foto_url"),
         };
         return acc;
       }, {});
@@ -154,15 +216,18 @@ app.get("/api/opname", async (req, res) => {
         const submittedData = submittedTasks[jenis_pekerjaan];
         return {
           kategori_pekerjaan: row.get("kategori_pekerjaan"),
-          jenis_pekerjaan: jenis_pekerjaan,
+          jenis_pekerjaan,
           vol_rab: row.get("vol_rab"),
           satuan: row.get("satuan"),
+          harga_material: row.get("harga_material") || 0,
+          harga_upah: row.get("harga_upah") || 0,
           item_id: submittedData?.item_id || null,
           volume_akhir: submittedData?.volume_akhir || "",
           selisih: submittedData?.selisih || "",
           isSubmitted: !!submittedData,
           approval_status: submittedData?.approval_status || "Not Submitted",
           submissionTime: submittedData?.tanggal_submit || null,
+          foto_url: submittedData?.foto_url || null,
         };
       });
     res.status(200).json(tasks);
@@ -172,7 +237,6 @@ app.get("/api/opname", async (req, res) => {
   }
 });
 
-// --- DATA SUBMISSION ---
 app.post("/api/opname/item/submit", async (req, res) => {
   try {
     const itemData = req.body;
@@ -209,8 +273,6 @@ app.post("/api/opname/item/submit", async (req, res) => {
       tanggal_submit: timestamp,
       approval_status: "Pending",
     };
-    // ===== DEBUG LOG 1 =====
-    console.log("\nDEBUG: Data yang AKAN DISIMPAN ke sheet:", rowToAdd);
     await finalSheet.addRow(rowToAdd);
     res
       .status(201)
@@ -227,7 +289,7 @@ app.post("/api/opname/item/submit", async (req, res) => {
   }
 });
 
-// --- KONTRAKTOR WORKFLOW ---
+// --- Endpoint untuk Kontraktor ---
 app.get("/api/toko_kontraktor", async (req, res) => {
   try {
     const { username } = req.query;
@@ -252,6 +314,8 @@ app.get("/api/toko_kontraktor", async (req, res) => {
         storesMap.set(kode_toko, {
           kode_toko,
           nama_toko: row.get("nama_toko"),
+          no_ulok: row.get("no_ulok") || "",
+          link_pdf: row.get("link_pdf") || "",
         });
       }
     });
@@ -323,25 +387,15 @@ app.get("/api/opname/pending", async (req, res) => {
         (row) => row.get("kode_toko") === kode_toko
       );
     }
-    const result = pendingItems.map((row) => {
-      const itemIdFromSheet = row.get("item_id");
-      // ===== DEBUG LOG 2 =====
-      console.log(
-        `\nDEBUG: Membaca baris dari sheet. item_id mentah:`,
-        itemIdFromSheet
-      );
-      return {
-        item_id: itemIdFromSheet,
-        kode_toko: row.get("kode_toko"),
-        nama_toko: row.get("nama_toko"),
-        pic_username: row.get("pic_username"),
-        tanggal_submit: row.get("tanggal_submit"),
-        jenis_pekerjaan: row.get("jenis_pekerjaan"),
-        volume_akhir: row.get("volume_akhir"),
-      };
-    });
-    // ===== DEBUG LOG 3 =====
-    console.log("\nDEBUG: Data PENDING yang DIKIRIM ke frontend:", result);
+    const result = pendingItems.map((row) => ({
+      item_id: row.get("item_id"),
+      kode_toko: row.get("kode_toko"),
+      nama_toko: row.get("nama_toko"),
+      pic_username: row.get("pic_username"),
+      tanggal_submit: row.get("tanggal_submit"),
+      jenis_pekerjaan: row.get("jenis_pekerjaan"),
+      volume_akhir: row.get("volume_akhir"),
+    }));
     res.status(200).json(result);
   } catch (error) {
     console.error("Error di /api/opname/pending:", error);
@@ -352,11 +406,8 @@ app.get("/api/opname/pending", async (req, res) => {
 app.patch("/api/opname/approve", async (req, res) => {
   try {
     const { item_id } = req.body;
-    // ===== DEBUG LOG 5 =====
-    console.log("\nDEBUG: Menerima permintaan APPROVE dengan body:", req.body);
-    if (!item_id) {
+    if (!item_id)
       return res.status(400).json({ message: "Item ID diperlukan." });
-    }
     await doc.loadInfo();
     const finalSheet = doc.sheetsByTitle["opname_final"];
     if (!finalSheet)
@@ -378,7 +429,7 @@ app.patch("/api/opname/approve", async (req, res) => {
   }
 });
 
-// --- VIEWING FINAL DATA ---
+// --- Endpoint untuk Melihat Data Final (Approved) ---
 app.get("/api/opname/final", async (req, res) => {
   try {
     const { kode_toko } = req.query;
@@ -398,25 +449,20 @@ app.get("/api/opname/final", async (req, res) => {
           row.get("approval_status") === "Approved"
       )
       .map((row) => ({
-        submission_id: row.get("submission_id"),
-        tanggal_submit: row.get("tanggal_submit"),
         kategori_pekerjaan: row.get("kategori_pekerjaan"),
         jenis_pekerjaan: row.get("jenis_pekerjaan"),
         vol_rab: row.get("vol_rab"),
         satuan: row.get("satuan"),
+        harga_material: row.get("harga_material"),
+        harga_upah: row.get("harga_upah"),
         volume_akhir: row.get("volume_akhir"),
         selisih: row.get("selisih"),
+        total_harga_akhir: row.get("total_harga_akhir"),
         approval_status: row.get("approval_status"),
+        foto_url: row.get("foto_url"),
+        tanggal_submit: row.get("tanggal_submit"),
       }));
-    const groupedByDate = submissions.reduce((acc, current) => {
-      const date = current.tanggal_submit.split(",")[0];
-      if (!acc[date]) {
-        acc[date] = [];
-      }
-      acc[date].push(current);
-      return acc;
-    }, {});
-    res.status(200).json(groupedByDate);
+    res.status(200).json(submissions);
   } catch (error) {
     console.error("Error di /api/opname/final:", error);
     res
@@ -424,6 +470,91 @@ app.get("/api/opname/final", async (req, res) => {
       .json({
         message: "Terjadi kesalahan pada server saat membaca data final.",
       });
+  }
+});
+
+// --- Endpoint baru untuk mengambil data RAB dari Form3/data_rab ---
+app.get("/api/rab", async (req, res) => {
+  try {
+    const { kode_toko } = req.query;
+    if (!kode_toko)
+      return res.status(400).json({ message: "Kode toko diperlukan." });
+
+    await doc.loadInfo();
+    const rabSheet = doc.sheetsByTitle["data_rab"];
+    if (!rabSheet)
+      return res
+        .status(500)
+        .json({ message: "Sheet 'data_rab' tidak ditemukan." });
+
+    const rows = await rabSheet.getRows();
+
+    const rabItems = rows
+      .filter((row) => row.get("kode_toko") === kode_toko)
+      .map((row) => ({
+        kategori_pekerjaan: row.get("kategori_pekerjaan"),
+        jenis_pekerjaan: row.get("jenis_pekerjaan"),
+        satuan: row.get("satuan"),
+        volume: row.get("vol_rab"),
+        harga_material: row.get("harga_material"),
+        harga_upah: row.get("harga_upah"),
+        total_harga: row.get("total_harga"),
+      }));
+
+    res.status(200).json(rabItems);
+  } catch (error) {
+    console.error("Error di /api/rab:", error);
+    res.status(500).json({ message: "Terjadi kesalahan pada server." });
+  }
+});
+
+// --- Endpoint Jembatan/Proxy Gambar ---
+app.get("/api/image-proxy", async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url) {
+      return res.status(400).send("URL gambar diperlukan.");
+    }
+    const response = await axios.get(url, { responseType: "arraybuffer" });
+    res.setHeader("Content-Type", response.headers["content-type"]);
+    res.send(response.data);
+  } catch (error) {
+    console.error("Gagal mem-proxy gambar:", error);
+    res.status(500).send("Gagal memuat gambar.");
+  }
+});
+
+app.get("/api/rab", async (req, res) => {
+  try {
+    const { kode_toko } = req.query;
+    if (!kode_toko)
+      return res.status(400).json({ message: "Kode toko diperlukan." });
+
+    await doc.loadInfo();
+    const rabSheet = doc.sheetsByTitle["data_rab"];
+    if (!rabSheet)
+      return res
+        .status(500)
+        .json({ message: "Sheet 'data_rab' tidak ditemukan." });
+
+    const rows = await rabSheet.getRows();
+
+    const rabItems = rows
+      .filter((row) => row.get("kode_toko") === kode_toko)
+      .map((row) => ({
+        kategori_pekerjaan: row.get("kategori_pekerjaan"),
+        jenis_pekerjaan: row.get("jenis_pekerjaan"),
+        satuan: row.get("satuan"),
+        volume: row.get("vol_rab"), // Menggunakan vol_rab sebagai volume
+        harga_material: row.get("harga_material"),
+        harga_upah: row.get("harga_upah"),
+        total_harga: row.get("total_harga"),
+      }));
+
+    res.status(200).json(rabItems);
+  } catch (error) {
+    console.error("Error di /api/rab:", error);
+    res.status(500).json({ message: "Terjadi kesalahan pada server." });
   }
 });
 

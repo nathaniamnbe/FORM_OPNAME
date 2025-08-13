@@ -1,14 +1,14 @@
-// src/components/FinalOpnameView.js - Versi Final yang Lebih Rapi
+// src/components/FinalOpnameView.js - Versi Final Diperbaiki
 
 "use client";
 
 import { useState, useEffect } from "react";
-// 1. Impor fungsi yang baru kita buat
 import { generateFinalOpnamePDF } from "../utils/pdfGenerator";
 
 const FinalOpnameView = ({ onBack, selectedStore }) => {
-  const [submissionsByDate, setSubmissionsByDate] = useState({});
+  const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     if (selectedStore?.kode_toko) {
@@ -16,7 +16,7 @@ const FinalOpnameView = ({ onBack, selectedStore }) => {
       fetch(`/api/opname/final?kode_toko=${selectedStore.kode_toko}`)
         .then((res) => res.json())
         .then((data) => {
-          setSubmissionsByDate(data);
+          setSubmissions(data);
           setLoading(false);
         })
         .catch((err) => {
@@ -26,21 +26,29 @@ const FinalOpnameView = ({ onBack, selectedStore }) => {
     }
   }, [selectedStore]);
 
-  // 2. Fungsi generatePDF sekarang menjadi sangat sederhana
-  const handleDownloadPDF = () => {
-    // Cukup panggil fungsi dari file terpisah dengan memberikan data yang dibutuhkan
-    generateFinalOpnamePDF(submissionsByDate, selectedStore);
+  const handleDownloadPDF = async () => {
+    setIsGenerating(true);
+    try {
+      // Langsung kirim array 'submissions' ke fungsi PDF
+      await generateFinalOpnamePDF(submissions, selectedStore);
+    } catch (error) {
+      console.error("Gagal membuat PDF:", error);
+      alert("Terjadi kesalahan saat membuat PDF.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   if (loading) {
     return (
-      <div className="container" style={{ textAlign: "center" }}>
+      <div
+        className="container"
+        style={{ paddingTop: "20px", textAlign: "center" }}
+      >
         <h3>Loading data opname...</h3>
       </div>
     );
   }
-
-  const dates = Object.keys(submissionsByDate);
 
   return (
     <div className="container" style={{ paddingTop: "20px" }}>
@@ -51,8 +59,8 @@ const FinalOpnameView = ({ onBack, selectedStore }) => {
             alignItems: "center",
             justifyContent: "space-between",
             marginBottom: "24px",
-            gap: "16px",
             flexWrap: "wrap",
+            gap: "16px",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -67,93 +75,64 @@ const FinalOpnameView = ({ onBack, selectedStore }) => {
               Riwayat Opname Final - {selectedStore.kode_toko}
             </h2>
           </div>
-          {dates.length > 0 && (
-            // 3. Tombol ini sekarang memanggil handleDownloadPDF
-            <button onClick={handleDownloadPDF} className="btn btn-primary">
-              Download PDF
+          {submissions.length > 0 && (
+            <button
+              onClick={handleDownloadPDF}
+              className="btn btn-primary"
+              disabled={isGenerating}
+            >
+              {isGenerating ? "Membuat PDF..." : "Download PDF"}
             </button>
           )}
         </div>
 
-        {/* ... Sisa dari kode JSX untuk menampilkan tabel tidak berubah ... */}
-        {dates.length === 0 ? (
+        {submissions.length === 0 ? (
           <p>Belum ada data opname yang di-approve untuk toko ini.</p>
         ) : (
-          dates.map((date) => (
-            <div
-              key={date}
-              className="card"
-              style={{ marginBottom: "20px", background: "#fafafa" }}
-            >
-              <h4
-                style={{
-                  borderBottom: "1px solid #ddd",
-                  paddingBottom: "10px",
-                }}
-              >
-                Tanggal Pengajuan: {date}
-              </h4>
-              <div style={{ overflowX: "auto", marginTop: "16px" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ backgroundColor: "#e9ecef" }}>
-                      <th style={{ padding: "12px" }}>Kategori</th>
-                      <th style={{ padding: "12px" }}>Jenis Pekerjaan</th>
-                      <th style={{ padding: "12px", textAlign: "center" }}>
-                        Vol RAB
-                      </th>
-                      <th style={{ padding: "12px", textAlign: "center" }}>
-                        Volume Akhir
-                      </th>
-                      <th style={{ padding: "12px", textAlign: "center" }}>
-                        Selisih
-                      </th>
-                      <th style={{ padding: "12px", textAlign: "center" }}>
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {submissionsByDate[date].map((item, index) => (
-                      <tr
-                        key={index}
-                        style={{ borderBottom: "1px solid #ddd" }}
+          <div style={{ overflowX: "auto", marginTop: "16px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ backgroundColor: "#e9ecef" }}>
+                  <th style={{ padding: "12px" }}>Kategori</th>
+                  <th style={{ padding: "12px" }}>Jenis Pekerjaan</th>
+                  <th style={{ padding: "12px", textAlign: "center" }}>
+                    Volume Akhir
+                  </th>
+                  <th style={{ padding: "12px", textAlign: "center" }}>
+                    Status
+                  </th>
+                  <th style={{ padding: "12px" }}>Tanggal Submit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {submissions.map((item, index) => (
+                  <tr key={index} style={{ borderBottom: "1px solid #ddd" }}>
+                    <td style={{ padding: "12px" }}>
+                      {item.kategori_pekerjaan}
+                    </td>
+                    <td style={{ padding: "12px" }}>{item.jenis_pekerjaan}</td>
+                    <td style={{ padding: "12px", textAlign: "center" }}>
+                      {item.volume_akhir} {item.satuan}
+                    </td>
+                    <td style={{ padding: "12px", textAlign: "center" }}>
+                      <span
+                        style={{
+                          padding: "4px 8px",
+                          borderRadius: "12px",
+                          background: "#28a745",
+                          color: "white",
+                          fontSize: "12px",
+                        }}
                       >
-                        <td style={{ padding: "12px" }}>
-                          {item.kategori_pekerjaan}
-                        </td>
-                        <td style={{ padding: "12px" }}>
-                          {item.jenis_pekerjaan}
-                        </td>
-                        <td style={{ padding: "12px", textAlign: "center" }}>
-                          {item.vol_rab} {item.satuan}
-                        </td>
-                        <td style={{ padding: "12px", textAlign: "center" }}>
-                          {item.volume_akhir}
-                        </td>
-                        <td style={{ padding: "12px", textAlign: "center" }}>
-                          {item.selisih}
-                        </td>
-                        <td style={{ padding: "12px", textAlign: "center" }}>
-                          <span
-                            style={{
-                              padding: "4px 8px",
-                              borderRadius: "12px",
-                              background: "#28a745",
-                              color: "white",
-                              fontSize: "12px",
-                            }}
-                          >
-                            {item.approval_status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))
+                        {item.approval_status}
+                      </span>
+                    </td>
+                    <td style={{ padding: "12px" }}>{item.tanggal_submit}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

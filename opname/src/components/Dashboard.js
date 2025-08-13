@@ -10,11 +10,12 @@ import FinalOpnameView from "./FinalOpnameView";
 import ApprovalPage from "./ApprovalPage";
 
 const Dashboard = () => {
-  // Hook useAuth sekarang hanya mengambil 'user', karena 'logout' akan ada di header utama
+  // Hook useAuth hanya mengambil 'user', karena logout diasumsikan ada di header utama
   const { user } = useAuth();
   const [activeView, setActiveView] = useState("dashboard");
   const [selectedStore, setSelectedStore] = useState(null);
 
+  // Tampilkan loading jika data user belum siap
   if (!user) {
     return (
       <div style={{ textAlign: "center", marginTop: "50px" }}>
@@ -28,9 +29,10 @@ const Dashboard = () => {
     setActiveView(nextView);
   };
 
-  // Fungsi renderContent tidak berubah, hanya akan dipanggil di dalam return utama
+  // Fungsi untuk merender konten berdasarkan 'activeView'
   const renderContent = () => {
     switch (activeView) {
+      // --- Rute untuk Peran PIC ---
       case "store-selection-pic":
         return (
           <StoreSelectionPage
@@ -67,6 +69,7 @@ const Dashboard = () => {
           />
         );
 
+      // --- Rute untuk Peran Kontraktor ---
       case "store-selection-kontraktor":
         return (
           <StoreSelectionPage
@@ -86,9 +89,32 @@ const Dashboard = () => {
           />
         );
 
+      case "history-selection-kontraktor":
+        return (
+          <StoreSelectionPage
+            onSelectStore={(store) =>
+              handleSelectStore(store, "history-detail-kontraktor")
+            }
+            onBack={() => setActiveView("dashboard")}
+            type="approval"
+          />
+        );
+
+      case "history-detail-kontraktor":
+        return (
+          <FinalOpnameView
+            onBack={() => setActiveView("history-selection-kontraktor")}
+            selectedStore={selectedStore}
+          />
+        );
+
+      // Halaman utama Dashboard
       default:
         return (
-          <div className="container" style={{ paddingTop: "40px" }}>
+          <div
+            className="container"
+            style={{ paddingTop: "40px", maxWidth: "900px" }}
+          >
             <div className="card">
               <h2 style={{ color: "var(--alfamart-red)", textAlign: "center" }}>
                 Selamat Datang, {user.name}!
@@ -112,6 +138,7 @@ const Dashboard = () => {
                   gap: "20px",
                 }}
               >
+                {/* Tombol untuk PIC */}
                 {user.role === "pic" && (
                   <>
                     <button
@@ -147,6 +174,7 @@ const Dashboard = () => {
                   </>
                 )}
 
+                {/* Tombol untuk Kontraktor */}
                 {user.role === "kontraktor" && (
                   <>
                     <button
@@ -167,6 +195,9 @@ const Dashboard = () => {
                       Persetujuan Opname
                     </button>
                     <button
+                      onClick={() =>
+                        setActiveView("history-selection-kontraktor")
+                      }
                       className="btn btn-secondary"
                       style={{
                         height: "120px",
@@ -189,7 +220,7 @@ const Dashboard = () => {
     }
   };
 
-  // Return sekarang HANYA merender konten utama, tanpa <header> atau <main>
+  // Komponen ini HANYA merender konten, tidak lagi menyertakan <header>
   return renderContent();
 };
 
