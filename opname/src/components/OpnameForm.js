@@ -25,13 +25,9 @@ const OpnameForm = ({ onBack, selectedStore }) => {
         .then((res) => res.json())
         .then((data) => {
           const items = data.map((task, index) => {
-            // PERBAIKAN: Gunakan volume_akhir yang sebenarnya untuk perhitungan
             const volAkhir = parseFloat(task.volume_akhir) || 0;
             const hargaMaterial = parseFloat(task.harga_material) || 0;
             const hargaUpah = parseFloat(task.harga_upah) || 0;
-
-            // PERBAIKAN: Total harga berdasarkan volume akhir (bisa negatif)
-            const total_harga = volAkhir * (hargaMaterial + hargaUpah);
 
             return {
               ...task,
@@ -39,7 +35,7 @@ const OpnameForm = ({ onBack, selectedStore }) => {
               isSubmitting: false,
               isUploading: false,
               foto_url: task.isSubmitted ? task.foto_url : null,
-              total_harga: total_harga, // Menggunakan perhitungan yang sudah diperbaiki
+              total_harga: volAkhir * (hargaMaterial + hargaUpah),
             };
           });
           setOpnameItems(items);
@@ -56,21 +52,16 @@ const OpnameForm = ({ onBack, selectedStore }) => {
     setOpnameItems((prevItems) =>
       prevItems.map((item) => {
         if (item.id === id && !item.isSubmitted) {
-          // PERBAIKAN: Gunakan volume akhir yang diinput user (bisa negatif)
-          const volAkhir = parseFloat(value) || 0;
-          const volRab = parseFloat(item.vol_rab) || 0;
-          const selisih = volAkhir - volRab;
+          const volAkhir = Number.parseFloat(value) || 0;
+          const selisih = volAkhir - item.vol_rab;
           const hargaMaterial = parseFloat(item.harga_material) || 0;
           const hargaUpah = parseFloat(item.harga_upah) || 0;
-
-          // PERBAIKAN: Total harga menggunakan volume akhir (bisa negatif)
           const total_harga = volAkhir * (hargaMaterial + hargaUpah);
-
           return {
             ...item,
             volume_akhir: value,
             selisih: selisih.toString(),
-            total_harga: total_harga, // Ini bisa jadi negatif jika volume_akhir negatif
+            total_harga,
           };
         }
         return item;
@@ -114,21 +105,17 @@ const OpnameForm = ({ onBack, selectedStore }) => {
   const handleItemSubmit = async (itemId) => {
     const itemToSubmit = opnameItems.find((item) => item.id === itemId);
     if (
-      itemToSubmit.volume_akhir === "" ||
-      itemToSubmit.volume_akhir === null ||
-      itemToSubmit.volume_akhir === undefined
+      !itemToSubmit.volume_akhir ||
+      String(itemToSubmit.volume_akhir).trim() === ""
     ) {
       alert("Volume akhir harus diisi sebelum menyimpan.");
       return;
     }
-
     setOpnameItems((prev) =>
       prev.map((item) =>
         item.id === itemId ? { ...item, isSubmitting: true } : item
       )
     );
-
-    // PERBAIKAN: Pastikan data yang dikirim mencerminkan nilai sebenarnya
     const submissionData = {
       kode_toko: selectedStore.kode_toko,
       nama_toko: selectedStore.nama_toko,
@@ -137,16 +124,11 @@ const OpnameForm = ({ onBack, selectedStore }) => {
       jenis_pekerjaan: itemToSubmit.jenis_pekerjaan,
       vol_rab: itemToSubmit.vol_rab,
       satuan: itemToSubmit.satuan,
-      volume_akhir: itemToSubmit.volume_akhir, // Bisa negatif
-      selisih: itemToSubmit.selisih, // Bisa negatif
+      volume_akhir: itemToSubmit.volume_akhir,
+      selisih: itemToSubmit.selisih,
       foto_url: itemToSubmit.foto_url,
-      harga_material: itemToSubmit.harga_material,
-      harga_upah: itemToSubmit.harga_upah,
-      total_harga_akhir: itemToSubmit.total_harga, // Bisa negatif
+      total_harga_akhir: itemToSubmit.total_harga,
     };
-
-    console.log("Data yang akan dikirim:", submissionData); // Debug log
-
     try {
       const response = await fetch("/api/opname/item/submit", {
         method: "POST",
@@ -211,7 +193,7 @@ const OpnameForm = ({ onBack, selectedStore }) => {
             className="btn btn-outline"
             style={{ padding: "8px 16px" }}
           >
-            Kembali
+            ← Kembali
           </button>
           <h2 style={{ color: "var(--alfamart-red)" }}>Input Opname Harian</h2>
         </div>
@@ -333,21 +315,17 @@ const OpnameForm = ({ onBack, selectedStore }) => {
                       }
                       placeholder="0"
                       disabled={item.isSubmitted}
-                      // PERBAIKAN: Izinkan input angka negatif
-                      step="any"
                     />
                   </td>
                   <td style={{ padding: "12px", textAlign: "center" }}>
                     <span
                       style={{
                         color:
-                          parseFloat(item.selisih) < 0
+                          item.selisih < 0
                             ? "red"
-                            : parseFloat(item.selisih) > 0
+                            : item.selisih > 0
                             ? "green"
                             : "black",
-                        fontWeight:
-                          parseFloat(item.selisih) !== 0 ? "bold" : "normal",
                       }}
                     >
                       {item.selisih || "0"} {item.satuan}
@@ -358,8 +336,6 @@ const OpnameForm = ({ onBack, selectedStore }) => {
                       padding: "12px",
                       textAlign: "right",
                       fontWeight: "bold",
-                      // PERBAIKAN: Warna merah untuk total negatif
-                      color: item.total_harga < 0 ? "red" : "black",
                     }}
                   >
                     {formatRupiah(item.total_harga)}
@@ -421,12 +397,7 @@ const OpnameForm = ({ onBack, selectedStore }) => {
                       <button
                         className="btn btn-primary btn-sm"
                         onClick={() => handleItemSubmit(item.id)}
-                        disabled={
-                          item.isSubmitting ||
-                          item.volume_akhir === "" ||
-                          item.volume_akhir === null ||
-                          item.volume_akhir === undefined
-                        }
+                        disabled={item.isSubmitting || !item.volume_akhir}
                       >
                         {item.isSubmitting ? "..." : "Simpan"}
                       </button>
@@ -436,108 +407,6 @@ const OpnameForm = ({ onBack, selectedStore }) => {
               ))}
             </tbody>
           </table>
-        </div>
-
-        {/* PERBAIKAN: Tambahkan ringkasan total di bawah tabel */}
-        <div
-          style={{
-            marginTop: "20px",
-            padding: "16px",
-            backgroundColor: "#f8f9fa",
-            borderRadius: "8px",
-          }}
-        >
-          <h4 style={{ color: "var(--alfamart-red)", marginBottom: "12px" }}>
-            Ringkasan Total
-          </h4>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginBottom: "8px",
-            }}
-          >
-            <span>Total Keseluruhan:</span>
-            <strong
-              style={{
-                color:
-                  opnameItems.reduce(
-                    (sum, item) => sum + (item.total_harga || 0),
-                    0
-                  ) < 0
-                    ? "red"
-                    : "black",
-              }}
-            >
-              {formatRupiah(
-                opnameItems.reduce(
-                  (sum, item) => sum + (item.total_harga || 0),
-                  0
-                )
-              )}
-            </strong>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginBottom: "8px",
-            }}
-          >
-            <span>PPN 11%:</span>
-            <strong
-              style={{
-                color:
-                  opnameItems.reduce(
-                    (sum, item) => sum + (item.total_harga || 0),
-                    0
-                  ) *
-                    0.11 <
-                  0
-                    ? "red"
-                    : "black",
-              }}
-            >
-              {formatRupiah(
-                opnameItems.reduce(
-                  (sum, item) => sum + (item.total_harga || 0),
-                  0
-                ) * 0.11
-              )}
-            </strong>
-          </div>
-          <hr style={{ margin: "12px 0" }} />
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: "18px",
-            }}
-          >
-            <span>
-              <strong>GRAND TOTAL:</strong>
-            </span>
-            <strong
-              style={{
-                color:
-                  opnameItems.reduce(
-                    (sum, item) => sum + (item.total_harga || 0),
-                    0
-                  ) *
-                    1.11 <
-                  0
-                    ? "red"
-                    : "black",
-              }}
-            >
-              {formatRupiah(
-                opnameItems.reduce(
-                  (sum, item) => sum + (item.total_harga || 0),
-                  0
-                ) * 1.11
-              )}
-            </strong>
-          </div>
         </div>
       </div>
     </div>
