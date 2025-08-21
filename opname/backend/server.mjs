@@ -12,7 +12,7 @@ import axios from "axios";
 import sharp from "sharp";
 
 // 2. Konfigurasi awal
-dotenv.config({ path: "./.env.local" });
+dotenv.config(); // Hapus path, biarkan kosong
 const app = express();
 // Sesudah
 const port = process.env.PORT || 3001;
