@@ -1,57 +1,35 @@
-"use client";
-import { AuthProvider, useAuth } from "./context/AuthContext";
-import Header from "./components/Header";
+// src/App.js
+
+import React from "react";
+import { useAuth } from "./context/AuthContext";
 import Login from "./components/Login";
 import Dashboard from "./components/Dashboard";
+import Header from "./components/Header"; // 1. IMPORT KOMPONEN HEADER
 import "./styles/theme.css";
 
-function AppContent() {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: "var(--gray-100)",
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              fontSize: "48px",
-              marginBottom: "16px",
-              color: "var(--alfamart-red)",
-            }}
-          >
-            🏪
-          </div>
-          <h2 style={{ color: "var(--alfamart-red)" }}>Loading...</h2>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Login />;
-  }
-
-  return (
-    <div style={{ minHeight: "100vh", backgroundColor: "var(--gray-100)" }}>
-      <Header />
-      <Dashboard />
-    </div>
-  );
-}
-
 function App() {
+  const { user } = useAuth();
+
+  // Kita tidak perlu menampilkan loading di sini jika sudah ditangani di context
+  // if (loading) {
+  //   return <div>Loading...</div>;
+  // }
+
+  // src/App.js
+
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <div className="App">
+      {user ? (
+        // Tampilkan ini jika user ADA
+        <>
+          <Header />
+          <Dashboard />
+        </>
+      ) : (
+        // Tampilkan ini jika user TIDAK ADA (null)
+        <Login />
+      )}
+    </div>
   );
 }
 
