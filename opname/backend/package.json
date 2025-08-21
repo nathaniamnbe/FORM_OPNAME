@@ -5,7 +5,7 @@
   "main": "server.mjs",
   "type": "module",
   "scripts": {
-    "start": "node server.mjs",
+    "start": "node --openssl-legacy-provider server.mjs",
     "dev": "nodemon server.mjs"
   },
   "dependencies": {
