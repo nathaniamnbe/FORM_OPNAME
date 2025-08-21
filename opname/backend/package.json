@@ -4,8 +4,11 @@
   "description": "Backend for Form Opname",
   "main": "server.mjs",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
-    "start": "node --openssl-legacy-provider server.mjs",
+    "start": "node server.mjs",
     "dev": "nodemon server.mjs"
   },
   "dependencies": {
@@ -14,9 +17,9 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
-    "google-auth-library": "latest",
-    "google-spreadsheet": "latest",
-    "googleapis": "latest",
+    "google-auth-library": "^9.14.1",
+    "google-spreadsheet": "^4.1.4",
+    "googleapis": "^144.0.0",
     "multer": "^2.0.2",
     "sharp": "^0.34.3"
   },
