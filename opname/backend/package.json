@@ -14,9 +14,9 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
-    "google-auth-library": "^10.2.1",
-    "google-spreadsheet": "^5.0.2",
-    "googleapis": "^155.0.1",
+    "google-auth-library": "latest",
+    "google-spreadsheet": "latest",
+    "googleapis": "latest",
     "multer": "^2.0.2",
     "sharp": "^0.34.3"
   },
