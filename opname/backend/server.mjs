@@ -18,7 +18,11 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 // 3. Middleware
-app.use(cors());
+const corsOptions = {
+  origin: process.env.FRONTEND_URL, // Ambil URL dari environment variable
+  optionsSuccessStatus: 200,
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage() });
 
