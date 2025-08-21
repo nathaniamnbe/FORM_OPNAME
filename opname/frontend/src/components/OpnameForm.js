@@ -21,7 +21,8 @@ const OpnameForm = ({ onBack, selectedStore }) => {
   useEffect(() => {
     if (selectedStore?.kode_toko) {
       setLoading(true);
-      fetch(`/api/opname?kode_toko=${selectedStore.kode_toko}`)
+      const apiUrl = process.env.REACT_APP_API_URL; // Tambahkan ini
+      fetch(`${apiUrl}/api/opname?kode_toko=${selectedStore.kode_toko}`) // Ubah ini
         .then((res) => res.json())
         .then((data) => {
           const items = data.map((task, index) => {
@@ -79,7 +80,9 @@ const OpnameForm = ({ onBack, selectedStore }) => {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const response = await fetch("/api/upload", {
+      const apiUrl = process.env.REACT_APP_API_URL; // Tambahkan ini
+      const response = await fetch(`${apiUrl}/api/upload`, {
+        // Ubah ini
         method: "POST",
         body: formData,
       });
@@ -130,7 +133,9 @@ const OpnameForm = ({ onBack, selectedStore }) => {
       total_harga_akhir: itemToSubmit.total_harga,
     };
     try {
-      const response = await fetch("/api/opname/item/submit", {
+      const apiUrl = process.env.REACT_APP_API_URL; // Tambahkan ini
+      const response = await fetch(`${apiUrl}/api/opname/item/submit`, {
+        // Ubah ini
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submissionData),

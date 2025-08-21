@@ -14,7 +14,8 @@ import sharp from "sharp";
 // 2. Konfigurasi awal
 dotenv.config({ path: "./.env.local" });
 const app = express();
-const port = 3001;
+// Sesudah
+const port = process.env.PORT || 3001;
 
 // 3. Middleware
 app.use(cors());

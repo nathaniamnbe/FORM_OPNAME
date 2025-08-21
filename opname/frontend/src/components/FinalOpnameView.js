@@ -10,21 +10,22 @@ const FinalOpnameView = ({ onBack, selectedStore }) => {
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  useEffect(() => {
-    if (selectedStore?.kode_toko) {
-      setLoading(true);
-      fetch(`/api/opname/final?kode_toko=${selectedStore.kode_toko}`)
-        .then((res) => res.json())
-        .then((data) => {
-          setSubmissions(data);
-          setLoading(false);
-        })
-        .catch((err) => {
-          console.error("Gagal mengambil data opname final:", err);
-          setLoading(false);
-        });
-    }
-  }, [selectedStore]);
+useEffect(() => {
+  if (selectedStore?.kode_toko) {
+    setLoading(true);
+    const apiUrl = process.env.REACT_APP_API_URL; // Tambahkan ini
+    fetch(`${apiUrl}/api/opname/final?kode_toko=${selectedStore.kode_toko}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setSubmissions(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Gagal mengambil data opname final:", err);
+        setLoading(false);
+      });
+  }
+}, [selectedStore]);
 
   const handleDownloadPDF = async () => {
     setIsGenerating(true);

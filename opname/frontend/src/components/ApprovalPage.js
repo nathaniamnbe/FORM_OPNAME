@@ -16,7 +16,8 @@ const ApprovalPage = ({ onBack, selectedStore }) => {
     }
 
     setLoading(true);
-    fetch(`/api/opname/pending?kode_toko=${selectedStore.kode_toko}`)
+    const apiUrl = process.env.REACT_APP_API_URL; // Tambahkan ini
+    fetch(`${apiUrl}/api/opname/pending?kode_toko=${selectedStore.kode_toko}`) // Ubah ini
       .then((res) => res.json())
       .then((data) => {
         // ===== DEBUG LOG 4 =====
@@ -44,11 +45,13 @@ const ApprovalPage = ({ onBack, selectedStore }) => {
     setPendingItems((prev) => prev.filter((item) => item.item_id !== itemId));
 
     try {
-      const response = await fetch("/api/opname/approve", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ item_id: itemId }),
-      });
+        const apiUrl = process.env.REACT_APP_API_URL; // Tambahkan ini
+        const response = await fetch(`${apiUrl}/api/opname/approve`, {
+          // Ubah ini
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ item_id: itemId }),
+        });
 
       const result = await response.json();
       if (!response.ok) {

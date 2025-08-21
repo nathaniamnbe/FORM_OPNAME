@@ -31,11 +31,12 @@ export const AuthProvider = ({ children }) => {
   const login = async (username, password) => {
     setLoading(true);
     try {
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
+    const apiUrl = process.env.REACT_APP_API_URL;
+    const response = await fetch(`${apiUrl}/api/login`, {
+      method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ username, password }),
+});
 
       if (response.ok) {
         const foundUser = await response.json();

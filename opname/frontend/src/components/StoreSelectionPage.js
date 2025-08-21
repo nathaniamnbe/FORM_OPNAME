@@ -15,23 +15,19 @@ const StoreSelectionPage = ({ onSelectStore, onBack, type }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
+    const apiUrl = process.env.REACT_APP_API_URL; // Tambahkan ini di atas
     if (!user) return;
 
     setLoading(true);
-    let storeApiUrl = "";
-
-    // Tentukan API mana yang akan dipanggil berdasarkan peran pengguna dan tujuan halaman
-    if ((type === "opname" || type === "final-opname") && user.role === "pic") {
-      storeApiUrl = `/api/toko?username=${user.username}`;
-    } else if (
-      (type === "approval" || type === "history") &&
-      user.role === "kontraktor"
-    ) {
-      storeApiUrl = `/api/toko_kontraktor?username=${user.username}`;
-    } else {
-      setLoading(false);
-      return;
-    }
+let storeApiUrl = "";
+if ((type === "opname" || type === "final-opname") && user.role === "pic") {
+  storeApiUrl = `${apiUrl}/api/toko?username=${user.username}`; // Ubah ini
+} else if (
+  (type === "approval" || type === "history") &&
+  user.role === "kontraktor"
+) {
+  storeApiUrl = `${apiUrl}/api/toko_kontraktor?username=${user.username}`; // Ubah ini
+}
 
     // Ambil daftar toko dari API yang sesuai
     fetch(storeApiUrl)
@@ -46,11 +42,11 @@ const StoreSelectionPage = ({ onSelectStore, onBack, type }) => {
       });
 
     // Jika kontraktor, ambil juga jumlah notifikasi pending untuk badge
-    if (user.role === "kontraktor" && type === "approval") {
-      fetch(`/api/opname/pending/counts?username=${user.username}`)
-        .then((res) => res.json())
-        .then((counts) => setNotificationCounts(counts));
-    }
+      if (user.role === "kontraktor" && type === "approval") {
+        fetch(`${apiUrl}/api/opname/pending/counts?username=${user.username}`) // Ubah
+          .then((res) => res.json())
+          .then((counts) => setNotificationCounts(counts));
+      }
   }, [type, user]);
 
   // Logika untuk memfilter daftar toko berdasarkan input di kolom pencarian

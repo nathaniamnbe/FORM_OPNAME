@@ -24,7 +24,8 @@ const formatRupiah = (number) => {
 const toBase64 = async (url) => {
   try {
     if (!url) return null;
-    const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(url)}`;
+    const apiUrl = process.env.REACT_APP_API_URL; // Tambahkan ini
+    const proxyUrl = `${apiUrl}/api/image-proxy?url=${encodeURIComponent(url)}`; // Ubah ini
     const response = await fetch(proxyUrl);
     if (!response.ok)
       throw new Error(
@@ -46,7 +47,8 @@ const toBase64 = async (url) => {
 // Fungsi untuk mengambil data RAB dari API
 const fetchRabData = async (kode_toko) => {
   try {
-    const response = await fetch(`/api/rab?kode_toko=${kode_toko}`);
+    const apiUrl = process.env.REACT_APP_API_URL; // Tambahkan ini
+    const response = await fetch(`${apiUrl}/api/rab?kode_toko=${kode_toko}`); // Ubah ini
     if (!response.ok) throw new Error("Gagal mengambil data RAB");
     return await response.json();
   } catch (error) {
