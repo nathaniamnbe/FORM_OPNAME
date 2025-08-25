@@ -1,8 +1,6 @@
-// src/context/AuthContext.js
-
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 
 const AuthContext = createContext();
 
@@ -15,35 +13,37 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  // 1. Saat dimuat, baca data user dari sessionStorage.
-  const [user, setUser] = useState(() => {
-    try {
-      const savedUser = sessionStorage.getItem("user"); // <-- GANTI KE sessionStorage
-      return savedUser ? JSON.parse(savedUser) : null;
-    } catch (error) {
-      console.error("Gagal parse user dari sessionStorage", error);
-      return null;
-    }
-  });
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    // Mengecek apakah user sudah login dari session sebelumnya
+    try {
+      const savedUser = localStorage.getItem("alfamart_user");
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      }
+    } catch (error) {
+      console.error("Gagal memuat data user dari localStorage", error);
+      localStorage.removeItem("alfamart_user");
+    }
+    setLoading(false);
+  }, []);
 
   const login = async (username, password) => {
-    setLoading(true);
     try {
       const response = await fetch("/api/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ username, password }),
       });
 
       if (response.ok) {
         const foundUser = await response.json();
-
-        // 2. Simpan user ke state DAN sessionStorage.
         setUser(foundUser);
-        sessionStorage.setItem("user", JSON.stringify(foundUser)); // <-- GANTI KE sessionStorage
-
+        localStorage.setItem("alfamart_user", JSON.stringify(foundUser));
         return { success: true };
       } else {
         const errorData = await response.json();
@@ -54,16 +54,16 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error("Error saat fetch ke API login:", error);
-      return { success: false, message: "Tidak dapat terhubung ke server." };
-    } finally {
-      setLoading(false);
+      return {
+        success: false,
+        message: "Tidak dapat terhubung ke server. Cek koneksi internet Anda.",
+      };
     }
   };
 
   const logout = () => {
-    // 3. Hapus user dari state DAN sessionStorage.
     setUser(null);
-    sessionStorage.removeItem("user"); // <-- GANTI KE sessionStorage
+    localStorage.removeItem("alfamart_user");
   };
 
   const value = {
