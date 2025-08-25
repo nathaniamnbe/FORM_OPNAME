@@ -69,7 +69,7 @@ const FinalOpnameView = ({ onBack, selectedStore }) => {
               className="btn btn-outline"
               style={{ padding: "8px 16px" }}
             >
-              ← Kembali
+              â† Kembali
             </button>
             <h2 style={{ color: "var(--alfamart-red)", margin: 0 }}>
               Riwayat Opname Final - {selectedStore.kode_toko}
