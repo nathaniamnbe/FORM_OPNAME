@@ -13,16 +13,12 @@ import sharp from "sharp";
 import crypto from "crypto";
 
 // 2. Konfigurasi awal
-dotenv.config();
+dotenv.config({ path: "./.env.local" });
 const app = express();
-const port = process.env.PORT || 3001;
+const port = 3001; // Fixed port to match app.ts
 
 // 3. Middleware
-const corsOptions = {
-  origin: process.env.FRONTEND_URL || "*",
-  optionsSuccessStatus: 200,
-};
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -38,19 +34,7 @@ const processPrivateKey = (key) => {
   if (!key) {
     throw new Error("GOOGLE_PRIVATE_KEY is missing");
   }
-  let processedKey = key.trim().replace(/^["']|["']$/g, "");
-  processedKey = processedKey.replace(/\\n/g, "\n");
-  if (!processedKey.includes("-----BEGIN PRIVATE KEY-----")) {
-    throw new Error("Invalid private key format - missing BEGIN marker");
-  }
-  if (!processedKey.includes("-----END PRIVATE KEY-----")) {
-    throw new Error("Invalid private key format - missing END marker");
-  }
-  const lines = processedKey.split("\n");
-  if (lines.length < 3) {
-    throw new Error("Private key appears to be malformed - too few lines");
-  }
-  return processedKey;
+  return key.replace(/\\n/g, "\n");
 };
 
 // 6. Inisialisasi Otentikasi Google Sheets yang Stabil
@@ -92,6 +76,7 @@ const initializeGoogleAuth = async () => {
 const logLoginAttempt = async (username, status) => {
   try {
     if (!doc || authError) return;
+    await doc.loadInfo();
     const logSheet = doc.sheetsByTitle["log_login"];
     if (logSheet) {
       const timestamp = new Date().toLocaleString("id-ID", {
@@ -174,6 +159,7 @@ app.post("/api/login", async (req, res) => {
         .status(500)
         .json({ message: "Service tidak tersedia karena masalah otentikasi." });
 
+    await doc.loadInfo();
     const usersSheet = doc.sheetsByTitle["users"];
     if (!usersSheet)
       return res
@@ -190,12 +176,14 @@ app.post("/api/login", async (req, res) => {
     const inputPassword = password.trim();
 
     const rows = await usersSheet.getRows();
-    const userRow = rows.find(
-      (row) =>
-        row.get("username")?.trim().toLowerCase() ===
-          inputUsername.toLowerCase() &&
-        row.get("password")?.toString().trim() === inputPassword
-    );
+    const userRow = rows.find((row) => {
+      const sheetUsername = row.get("username")?.trim();
+      const sheetPassword = row.get("password")?.toString().trim();
+      return (
+        sheetUsername?.toLowerCase() === inputUsername.toLowerCase() &&
+        sheetPassword === inputPassword
+      );
+    });
 
     if (userRow) {
       await logLoginAttempt(inputUsername, "SUCCESS");
@@ -232,6 +220,7 @@ app.get("/api/pic-kontraktor", async (req, res) => {
     if (!no_ulok)
       return res.status(400).json({ message: "No. Ulok diperlukan." });
 
+    await doc.loadInfo();
     const rabSheet = doc.sheetsByTitle["data_rab"];
     if (!rabSheet)
       return res
@@ -242,10 +231,11 @@ app.get("/api/pic-kontraktor", async (req, res) => {
     const matchedRow = rows.find((row) => row.get("no_ulok") === no_ulok);
 
     if (matchedRow) {
-      res.status(200).json({
+      const picKontraktorData = {
         pic_username: matchedRow.get("pic_username") || "N/A",
         kontraktor_username: matchedRow.get("kontraktor_username") || "N/A",
-      });
+      };
+      res.status(200).json(picKontraktorData);
     } else {
       res.status(404).json({
         message: "Data tidak ditemukan untuk no_ulok tersebut.",
@@ -255,7 +245,11 @@ app.get("/api/pic-kontraktor", async (req, res) => {
     }
   } catch (error) {
     console.error("Error di /api/pic-kontraktor:", error);
-    res.status(500).json({ message: "Terjadi kesalahan pada server." });
+    res.status(500).json({
+      message: "Terjadi kesalahan pada server.",
+      pic_username: "N/A",
+      kontraktor_username: "N/A",
+    });
   }
 });
 
@@ -268,6 +262,7 @@ app.get("/api/toko", async (req, res) => {
     if (!username)
       return res.status(400).json({ message: "Username PIC diperlukan." });
 
+    await doc.loadInfo();
     const rabSheet = doc.sheetsByTitle["data_rab"];
     if (!rabSheet)
       return res
@@ -306,10 +301,13 @@ app.get("/api/opname", async (req, res) => {
     if (!kode_toko)
       return res.status(400).json({ message: "Kode toko diperlukan." });
 
+    await doc.loadInfo();
     const rabSheet = doc.sheetsByTitle["data_rab"];
     const finalSheet = doc.sheetsByTitle["opname_final"];
     if (!rabSheet || !finalSheet)
-      return res.status(500).json({ message: "Sheet data tidak ditemukan." });
+      return res
+        .status(500)
+        .json({ message: "Sheet data_rab atau opname_final tidak ditemukan." });
 
     const [rabRows, finalRows] = await Promise.all([
       rabSheet.getRows(),
@@ -358,16 +356,19 @@ app.get("/api/opname", async (req, res) => {
   }
 });
 
-// --- ENDPOINT SUBMIT OPNAME ---
+// --- ENDPOINT SUBMIT OPNAME YANG SUDAH DIPERBAIKI ---
 app.post("/api/opname/item/submit", async (req, res) => {
   try {
     if (authError)
       return res.status(500).json({ message: "Service tidak tersedia." });
     const itemData = req.body;
+    console.log("Data yang diterima:", itemData);
+
     if (!itemData || !itemData.kode_toko || !itemData.jenis_pekerjaan) {
       return res.status(400).json({ message: "Data item tidak lengkap." });
     }
 
+    await doc.loadInfo();
     const finalSheet = doc.sheetsByTitle["opname_final"];
     if (!finalSheet)
       return res
@@ -383,12 +384,10 @@ app.post("/api/opname/item/submit", async (req, res) => {
     );
 
     if (existingRow) {
-      return res
-        .status(409)
-        .json({
-          message:
-            "Pekerjaan ini sudah pernah disimpan sebelumnya oleh PIC yang sama.",
-        });
+      return res.status(409).json({
+        message:
+          "Pekerjaan ini sudah pernah disimpan sebelumnya oleh PIC yang sama.",
+      });
     }
 
     const timestamp = new Date().toLocaleString("id-ID", {
@@ -403,23 +402,55 @@ app.post("/api/opname/item/submit", async (req, res) => {
       .substr(2, 9)}`;
 
     const rowToAdd = {
-      submission_id,
-      item_id,
-      ...itemData,
+      submission_id: submission_id,
+      kode_toko: itemData.kode_toko || "",
+      nama_toko: itemData.nama_toko || "",
+      pic_username: itemData.pic_username || "",
       tanggal_submit: timestamp,
+      kategori_pekerjaan: itemData.kategori_pekerjaan || "",
+      jenis_pekerjaan: itemData.jenis_pekerjaan || "",
+      vol_rab: itemData.vol_rab || "",
+      satuan: itemData.satuan || "",
+      volume_akhir: itemData.volume_akhir || "",
+      selisih: itemData.selisih || "",
+      harga_material: itemData.harga_material || 0,
+      harga_upah: itemData.harga_upah || 0,
+      total_harga_akhir: itemData.total_harga_akhir || 0,
+      foto_url: itemData.foto_url || "",
+      item_id: item_id,
       approval_status: "Pending",
     };
 
-    await finalSheet.addRow(rowToAdd);
-    res.status(201).json({
-      message: `Pekerjaan "${itemData.jenis_pekerjaan}" berhasil disimpan.`,
-      success: true,
-    });
+    console.log("Data yang akan ditambahkan ke sheet:", rowToAdd);
+
+    try {
+      const newRow = await finalSheet.addRow(rowToAdd);
+      console.log(
+        "Baris berhasil ditambahkan dengan row number:",
+        newRow.rowNumber
+      );
+
+      res.status(201).json({
+        message: `Pekerjaan "${itemData.jenis_pekerjaan}" berhasil disimpan.`,
+        item_id: item_id,
+        submission_id: submission_id,
+        tanggal_submit: timestamp,
+        row_number: newRow.rowNumber,
+        success: true,
+      });
+    } catch (sheetError) {
+      console.error("Error saat menambah row ke sheet:", sheetError);
+      res.status(500).json({
+        message: "Gagal menambahkan data ke Google Sheets",
+        error: sheetError.message,
+      });
+    }
   } catch (error) {
     console.error("Error di /api/opname/item/submit:", error);
-    res
-      .status(500)
-      .json({ message: "Terjadi kesalahan pada server saat menyimpan item." });
+    res.status(500).json({
+      message: "Terjadi kesalahan pada server saat menyimpan item.",
+      error: error.message,
+    });
   }
 });
 
@@ -435,6 +466,7 @@ app.get("/api/toko_kontraktor", async (req, res) => {
         .status(400)
         .json({ message: "Username Kontraktor diperlukan." });
 
+    await doc.loadInfo();
     const rabSheet = doc.sheetsByTitle["data_rab"];
     if (!rabSheet)
       return res
@@ -475,10 +507,13 @@ app.get("/api/opname/pending/counts", async (req, res) => {
         .status(400)
         .json({ message: "Username Kontraktor diperlukan." });
 
+    await doc.loadInfo();
     const finalSheet = doc.sheetsByTitle["opname_final"];
     const rabSheet = doc.sheetsByTitle["data_rab"];
     if (!finalSheet || !rabSheet)
-      return res.status(500).json({ message: "Sheet data tidak ditemukan." });
+      return res
+        .status(500)
+        .json({ message: "Sheet opname_final atau data_rab tidak ditemukan." });
 
     const [finalRows, rabRows] = await Promise.all([
       finalSheet.getRows(),
@@ -517,6 +552,7 @@ app.get("/api/opname/pending", async (req, res) => {
       return res.status(500).json({ message: "Service tidak tersedia." });
     const { kode_toko } = req.query;
 
+    await doc.loadInfo();
     const finalSheet = doc.sheetsByTitle["opname_final"];
     if (!finalSheet)
       return res
@@ -557,6 +593,7 @@ app.patch("/api/opname/approve", async (req, res) => {
     if (!item_id)
       return res.status(400).json({ message: "Item ID diperlukan." });
 
+    await doc.loadInfo();
     const finalSheet = doc.sheetsByTitle["opname_final"];
     if (!finalSheet)
       return res
@@ -587,6 +624,7 @@ app.get("/api/opname/final", async (req, res) => {
     if (!kode_toko)
       return res.status(400).json({ message: "Kode toko diperlukan." });
 
+    await doc.loadInfo();
     const finalSheet = doc.sheetsByTitle["opname_final"];
     if (!finalSheet)
       return res
@@ -617,11 +655,9 @@ app.get("/api/opname/final", async (req, res) => {
     res.status(200).json(submissions);
   } catch (error) {
     console.error("Error di /api/opname/final:", error);
-    res
-      .status(500)
-      .json({
-        message: "Terjadi kesalahan pada server saat membaca data final.",
-      });
+    res.status(500).json({
+      message: "Terjadi kesalahan pada server saat membaca data final.",
+    });
   }
 });
 
@@ -633,6 +669,7 @@ app.get("/api/rab", async (req, res) => {
     if (!kode_toko)
       return res.status(400).json({ message: "Kode toko diperlukan." });
 
+    await doc.loadInfo();
     const rabSheet = doc.sheetsByTitle["data_rab"];
     if (!rabSheet)
       return res
@@ -675,8 +712,71 @@ app.get("/api/image-proxy", async (req, res) => {
   }
 });
 
-// --- Endpoint Debug ---
-// (Endpoint debug sengaja dihilangkan agar kode lebih ringkas untuk produksi)
+// --- ENDPOINT DEBUG untuk troubleshooting ---
+app.get("/api/debug/opname-final", async (req, res) => {
+  try {
+    await doc.loadInfo();
+    const finalSheet = doc.sheetsByTitle["opname_final"];
+    if (!finalSheet) {
+      return res
+        .status(500)
+        .json({ message: "Sheet 'opname_final' tidak ditemukan." });
+    }
+
+    const rows = await finalSheet.getRows();
+    const allData = rows.map((row, index) => ({
+      rowNumber: row.rowNumber,
+      index: index,
+      submission_id: row.get("submission_id") || "N/A",
+      kode_toko: row.get("kode_toko") || "N/A",
+      nama_toko: row.get("nama_toko") || "N/A",
+      pic_username: row.get("pic_username") || "N/A",
+      jenis_pekerjaan: row.get("jenis_pekerjaan") || "N/A",
+      tanggal_submit: row.get("tanggal_submit") || "N/A",
+      approval_status: row.get("approval_status") || "N/A",
+    }));
+
+    res.status(200).json({
+      message: "Debug data dari opname_final",
+      totalRows: rows.length,
+      sheetTitle: finalSheet.title,
+      data: allData,
+    });
+  } catch (error) {
+    console.error("Error di /api/debug/opname-final:", error);
+    res.status(500).json({
+      message: "Error mengambil data debug",
+      error: error.message,
+    });
+  }
+});
+
+// --- ENDPOINT DEBUG untuk melihat headers sheet ---
+app.get("/api/debug/sheet-headers", async (req, res) => {
+  try {
+    await doc.loadInfo();
+    const finalSheet = doc.sheetsByTitle["opname_final"];
+    if (!finalSheet) {
+      return res
+        .status(500)
+        .json({ message: "Sheet 'opname_final' tidak ditemukan." });
+    }
+
+    await finalSheet.loadHeaderRow();
+
+    res.status(200).json({
+      message: "Headers dari sheet opname_final",
+      headers: finalSheet.headerValues,
+      sheetTitle: finalSheet.title,
+    });
+  } catch (error) {
+    console.error("Error di /api/debug/sheet-headers:", error);
+    res.status(500).json({
+      message: "Error mengambil headers sheet",
+      error: error.message,
+    });
+  }
+});
 
 // --- Middleware Penanganan Error ---
 app.use((error, req, res, next) => {
@@ -689,6 +789,11 @@ const startServer = async () => {
   await initializeGoogleAuth();
   app.listen(port, () => {
     console.log(`✅ Server backend berjalan di http://localhost:${port}`);
+    console.log("Endpoints yang tersedia:");
+    console.log("- Debug: http://localhost:3001/api/debug/opname-final");
+    console.log(
+      "- Debug Headers: http://localhost:3001/api/debug/sheet-headers"
+    );
     if (authError) {
       console.error(
         "⚠️ Server running, but Google Sheets authentication FAILED."
